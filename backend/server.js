@@ -161,7 +161,20 @@ app.post('/api/admin/ratio', requireAdmin, (req, res) => {
 // ─── GET /api/admin/verify ───────────────────────────────────────────────────
 app.get('/api/admin/verify', requireAdmin, (req, res) => res.json({ authenticated: true }));
 
+app.get('/ping', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+
 app.listen(PORT, () => {
   console.log(`IPL 2026 backend running on http://localhost:${PORT}`);
   console.log(`RapidAPI key: ${RAPID_KEY ? 'loaded ✓' : 'MISSING — set RAPID_API_KEY in .env'}`);
+
+  // Keep Render free tier alive — ping self every 10 minutes
+  const SELF_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+  setInterval(async () => {
+    try {
+      await fetch(`${SELF_URL}/ping`);
+      console.log(`[keep-alive] pinged at ${new Date().toISOString()}`);
+    } catch (e) {
+      console.log('[keep-alive] ping failed:', e.message);
+    }
+  }, 10 * 60 * 1000); // every 10 minutes
 });
