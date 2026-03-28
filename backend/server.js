@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
 const db = require('./db');
+const STATIC_SCHEDULE = require('./ipl2026-schedule');
 
 const app = express();
 app.use(cors({
@@ -42,59 +43,73 @@ async function fetchIPLMatches() {
     return cache.matches;
   }
 
+  // Start with static schedule so matches are never lost
+  const staticMatches = STATIC_SCHEDULE.map(m => ({
+    ...m,
+    seriesName: 'Indian Premier League 2026',
+    matchFormat: 'T20',
+    team1: { teamName: m.teams[0] },
+    team2: { teamName: m.teams[1] },
+    status: 'Match not started',
+    matchStarted: false,
+    matchEnded: false,
+  }));
+
   const freshMatches = [];
 
-  // 1. Get upcoming from rolling schedule
+  // 1. Get upcoming from Cricbuzz rolling schedule
   try {
     const res = await fetch(`${BASE}/cricket-schedule`, { headers: headers() });
     const data = await res.json();
     const schedules = data?.response?.schedules || [];
     for (const day of schedules) {
-      const date = day.scheduleAdWrapper?.date || '';
       const list = day.scheduleAdWrapper?.matchScheduleList || [];
       for (const series of list) {
         const isIPL = series.seriesId === IPL_SERIES_ID ||
           (series.seriesName && series.seriesName.toLowerCase().includes('indian premier league 2026'));
         if (!isIPL) continue;
         for (const m of (series.matchInfo || [])) {
-          freshMatches.push(normalizeMatch(m, series.seriesName, date));
+          freshMatches.push(normalizeMatch(m, series.seriesName, day.scheduleAdWrapper?.date || ''));
         }
       }
     }
   } catch (e) { console.error('Schedule fetch error:', e.message); }
 
-  // 2. Get live match statuses from cricapi.com (free, works from server)
+  // 2. Get live matches from cricapi.com
   try {
-    const liveRes = await fetch(
-      `https://api.cricapi.com/v1/currentMatches?apikey=${process.env.CRICKET_API_KEY || ''}&offset=0`
-    );
-    const liveData = await liveRes.json();
-    const liveIPL = (liveData.data || []).filter(m =>
-      m.name && m.name.toLowerCase().includes('ipl')
-    );
-    for (const lm of liveIPL) {
-      freshMatches.push({
-        id: lm.id,
-        seriesName: 'Indian Premier League 2026',
-        matchDesc: lm.name,
-        matchFormat: 'T20',
-        dateTimeGMT: lm.dateTimeGMT,
-        date: lm.date,
-        teams: lm.teams || [],
-        team1: { teamName: lm.teams?.[0] || 'TBD' },
-        team2: { teamName: lm.teams?.[1] || 'TBD' },
-        venue: lm.venue || '',
-        status: lm.status || '',
-        matchStarted: lm.matchStarted || false,
-        matchEnded: lm.matchEnded || false,
-        score: lm.score || [],
-      });
+    const cricKey = process.env.CRICKET_API_KEY;
+    if (cricKey) {
+      const liveRes = await fetch(`https://api.cricapi.com/v1/currentMatches?apikey=${cricKey}&offset=0`);
+      const liveData = await liveRes.json();
+      const liveIPL = (liveData.data || []).filter(m =>
+        m.name && m.name.toLowerCase().includes('ipl')
+      );
+      for (const lm of liveIPL) {
+        freshMatches.push({
+          id: lm.id,
+          seriesName: 'Indian Premier League 2026',
+          matchDesc: lm.name,
+          matchFormat: 'T20',
+          dateTimeGMT: lm.dateTimeGMT,
+          date: lm.date,
+          teams: lm.teams || [],
+          team1: { teamName: lm.teams?.[0] || 'TBD' },
+          team2: { teamName: lm.teams?.[1] || 'TBD' },
+          venue: lm.venue || '',
+          status: lm.status || '',
+          matchStarted: lm.matchStarted || false,
+          matchEnded: lm.matchEnded || false,
+          score: lm.score || [],
+        });
+      }
     }
   } catch (e) { console.error('Live fetch error:', e.message); }
 
-  // 3. Merge with cached (so past matches aren't lost)
+  // 3. Merge: static base → cached → fresh live (priority order)
   const stored = db.getCachedMatches();
-  const merged = mergeMatches(stored, freshMatches);
+  let merged = mergeMatches(staticMatches, stored);
+  merged = mergeMatches(merged, freshMatches);
+
   if (freshMatches.length > 0) db.cacheMatches(freshMatches);
 
   cache.matches = merged;
