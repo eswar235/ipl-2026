@@ -210,5 +210,5 @@ app.listen(PORT, () => {
   setInterval(async () => {
     try { await fetch(`${SELF_URL}/ping`); console.log(`[keep-alive] ${new Date().toISOString()}`); }
     catch (e) { console.log('[keep-alive] failed:', e.message); }
-  }, 10 * 60 * 1000);
+  }, 4 * 60 * 1000); // every 4 minutes to prevent Render sleep
 });
