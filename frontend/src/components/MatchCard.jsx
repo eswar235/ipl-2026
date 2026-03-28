@@ -104,7 +104,7 @@ export default function MatchCard({ match }) {
     };
     if (isLive) {
       load();
-      const interval = setInterval(load, 30000);
+      const interval = setInterval(load, 10000); // refresh every 10 seconds
       return () => clearInterval(interval);
     }
   }, [match.id, isLive]);

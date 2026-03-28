@@ -24,7 +24,7 @@ const hLive = () => ({ 'x-rapidapi-key': RAPID_KEY, 'x-rapidapi-host': HOST_LIVE
 
 // ─── Cache ───────────────────────────────────────────────────────────────────
 const cache = { matches: null, ts: 0 };
-const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+const CACHE_TTL = 15 * 1000; // 15 seconds — fast updates during live matches
 
 // ─── Admin auth ───────────────────────────────────────────────────────────────
 function requireAdmin(req, res, next) {
