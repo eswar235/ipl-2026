@@ -93,20 +93,26 @@ export default function MatchCard({ match }) {
     (match.status || '').toLowerCase().includes('innings');
 
   useEffect(() => {
-    if (!isLive || !match.id) return;
+    if (!match.id) return;
     const load = async () => {
       try {
         const data = await fetchMatchScore(match.id);
-        if (data?.data) setLiveScore(data.data);
+        // Handle Cricbuzz response format
+        const info = data?.response?.matchInfo || data?.data;
+        if (info && Object.keys(info).length > 0) setLiveScore(info);
       } catch { /* silent */ }
     };
-    load();
-    const interval = setInterval(load, 30000); // refresh every 30s
-    return () => clearInterval(interval);
+    if (isLive) {
+      load();
+      const interval = setInterval(load, 30000);
+      return () => clearInterval(interval);
+    }
   }, [match.id, isLive]);
 
-  const score1 = liveScore?.score?.find(s => s.inning?.includes(team1))?.r;
-  const score2 = liveScore?.score?.find(s => s.inning?.includes(team2))?.r;
+  // Score from live API or from match.score (cricapi format)
+  const matchScore = match.score || [];
+  const score1 = liveScore?.score?.[0]?.r ?? matchScore.find(s => s.inning?.includes(team1))?.r;
+  const score2 = liveScore?.score?.[1]?.r ?? matchScore.find(s => s.inning?.includes(team2))?.r;
   const scoreStr1 = score1 !== undefined ? `${score1}` : null;
   const scoreStr2 = score2 !== undefined ? `${score2}` : null;
 
