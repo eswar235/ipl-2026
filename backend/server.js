@@ -36,36 +36,66 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// ─── Fetch IPL matches from rolling schedule ─────────────────────────────────
+// ─── Fetch IPL matches — schedule + live status ──────────────────────────────
 async function fetchIPLMatches() {
   if (cache.matches && Date.now() - cache.ts < CACHE_TTL) {
     return cache.matches;
   }
 
-  const res = await fetch(`${BASE}/cricket-schedule`, { headers: headers() });
-  const data = await res.json();
-  const schedules = data?.response?.schedules || [];
+  const freshMatches = [];
 
-  const matches = [];
-  for (const day of schedules) {
-    const date = day.scheduleAdWrapper?.date || '';
-    const list = day.scheduleAdWrapper?.matchScheduleList || [];
-    for (const series of list) {
-      const isIPL = series.seriesId === IPL_SERIES_ID ||
-        (series.seriesName && series.seriesName.toLowerCase().includes('indian premier league 2026'));
-      if (!isIPL) continue;
-      for (const m of (series.matchInfo || [])) {
-        matches.push(normalizeMatch(m, series.seriesName, date));
+  // 1. Get upcoming from rolling schedule
+  try {
+    const res = await fetch(`${BASE}/cricket-schedule`, { headers: headers() });
+    const data = await res.json();
+    const schedules = data?.response?.schedules || [];
+    for (const day of schedules) {
+      const date = day.scheduleAdWrapper?.date || '';
+      const list = day.scheduleAdWrapper?.matchScheduleList || [];
+      for (const series of list) {
+        const isIPL = series.seriesId === IPL_SERIES_ID ||
+          (series.seriesName && series.seriesName.toLowerCase().includes('indian premier league 2026'));
+        if (!isIPL) continue;
+        for (const m of (series.matchInfo || [])) {
+          freshMatches.push(normalizeMatch(m, series.seriesName, date));
+        }
       }
     }
-  }
+  } catch (e) { console.error('Schedule fetch error:', e.message); }
 
-  // If schedule window doesn't show IPL yet, return stored matches from db cache
+  // 2. Get live match statuses from cricapi.com (free, works from server)
+  try {
+    const liveRes = await fetch(
+      `https://api.cricapi.com/v1/currentMatches?apikey=${process.env.CRICKET_API_KEY || ''}&offset=0`
+    );
+    const liveData = await liveRes.json();
+    const liveIPL = (liveData.data || []).filter(m =>
+      m.name && m.name.toLowerCase().includes('ipl')
+    );
+    for (const lm of liveIPL) {
+      freshMatches.push({
+        id: lm.id,
+        seriesName: 'Indian Premier League 2026',
+        matchDesc: lm.name,
+        matchFormat: 'T20',
+        dateTimeGMT: lm.dateTimeGMT,
+        date: lm.date,
+        teams: lm.teams || [],
+        team1: { teamName: lm.teams?.[0] || 'TBD' },
+        team2: { teamName: lm.teams?.[1] || 'TBD' },
+        venue: lm.venue || '',
+        status: lm.status || '',
+        matchStarted: lm.matchStarted || false,
+        matchEnded: lm.matchEnded || false,
+        score: lm.score || [],
+      });
+    }
+  } catch (e) { console.error('Live fetch error:', e.message); }
+
+  // 3. Merge with cached (so past matches aren't lost)
   const stored = db.getCachedMatches();
-  const merged = mergeMatches(stored, matches);
-
-  // Persist newly found matches
-  if (matches.length > 0) db.cacheMatches(matches);
+  const merged = mergeMatches(stored, freshMatches);
+  if (freshMatches.length > 0) db.cacheMatches(freshMatches);
 
   cache.matches = merged;
   cache.ts = Date.now();
@@ -138,10 +168,17 @@ app.get('/api/live', async (req, res) => {
 // ─── GET /api/match/:id/score ────────────────────────────────────────────────
 app.get('/api/match/:id/score', async (req, res) => {
   try {
-    if (!RAPID_KEY) return res.status(500).json({ error: 'No API key' });
-    const r = await fetch(`${BASE}/cricket-match-info?matchid=${req.params.id}`, { headers: headers() });
-    const data = await r.json();
-    res.json(data);
+    // Try cricapi.com first (works for live IPL scores)
+    const cricKey = process.env.CRICKET_API_KEY;
+    if (cricKey) {
+      const r = await fetch(`https://api.cricapi.com/v1/match_info?apikey=${cricKey}&id=${req.params.id}`);
+      const data = await r.json();
+      if (data.status === 'success') return res.json(data);
+    }
+    // Fallback to Cricbuzz
+    const r2 = await fetch(`${BASE}/cricket-match-info?matchid=${req.params.id}`, { headers: headers() });
+    const data2 = await r2.json();
+    res.json(data2);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
