@@ -109,10 +109,11 @@ export default function MatchCard({ match }) {
     }
   }, [match.id, isLive]);
 
-  // Score from live API or from match.score (cricapi format)
+  // Score from live API or from match.liveScore
   const matchScore = match.score || [];
-  const score1 = liveScore?.score?.[0]?.r ?? matchScore.find(s => s.inning?.includes(team1))?.r;
-  const score2 = liveScore?.score?.[1]?.r ?? matchScore.find(s => s.inning?.includes(team2))?.r;
+  const liveScoreMap = liveScore || match.liveScore || {};
+  const score1 = liveScoreMap[team1] ?? matchScore.find(s => s.inning?.includes(team1))?.r;
+  const score2 = liveScoreMap[team2] ?? matchScore.find(s => s.inning?.includes(team2))?.r;
   const scoreStr1 = score1 !== undefined ? `${score1}` : null;
   const scoreStr2 = score2 !== undefined ? `${score2}` : null;
 
