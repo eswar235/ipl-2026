@@ -76,8 +76,8 @@ export default function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span style={{ fontSize: 24 }}>🏏</span>
             <div>
-              <h1 style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.2 }}>IPL 2026</h1>
-              <p style={{ fontSize: 11, color: 'var(--muted)' }}>Live Schedule & Scores</p>
+              <h1 style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.2 }}>Reddy</h1>
+              <p style={{ fontSize: 11, color: 'var(--muted)' }}>IPL 2026 Live Schedule & Scores</p>
             </div>
             {liveCount > 0 && (
               <span style={{
