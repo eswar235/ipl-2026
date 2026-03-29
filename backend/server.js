@@ -33,11 +33,10 @@ function requireAdmin(req, res, next) {
 }
 
 // ─── Fetch live IPL matches from Cricbuzz full API ───────────────────────────
-async function fetchLiveIPLFromCricbuzz() {
-  const res = await fetch(`https://${HOST_LIVE}/matches/v1/live`, { headers: hLive() });
+async function fetchFromCricbuzz(type) {
+  const res = await fetch(`https://${HOST_LIVE}/matches/v1/${type}`, { headers: hLive() });
   const data = await res.json();
-  const liveMatches = [];
-
+  const matches = [];
   for (const typeMatch of (data.typeMatches || [])) {
     for (const sm of (typeMatch.seriesMatches || [])) {
       const wrapper = sm.seriesAdWrapper;
@@ -46,7 +45,7 @@ async function fetchLiveIPLFromCricbuzz() {
         const info = m.matchInfo;
         const score = m.matchScore;
         if (!info) continue;
-        liveMatches.push({
+        matches.push({
           id: String(info.matchId),
           seriesName: info.seriesName,
           matchDesc: info.matchDesc,
@@ -66,7 +65,7 @@ async function fetchLiveIPLFromCricbuzz() {
       }
     }
   }
-  return liveMatches;
+  return matches;
 }
 
 function formatScore(score, info) {
@@ -128,9 +127,15 @@ async function fetchIPLMatches() {
     status: 'Match not started', matchStarted: false, matchEnded: false,
   }));
 
-  // 2. Live matches from full Cricbuzz API
+  // 2. Live + Recent matches from full Cricbuzz API
   let liveMatches = [];
-  try { liveMatches = await fetchLiveIPLFromCricbuzz(); } catch (e) { console.error('Live fetch error:', e.message); }
+  try {
+    const [live, recent] = await Promise.all([
+      fetchFromCricbuzz('live'),
+      fetchFromCricbuzz('recent')
+    ]);
+    liveMatches = [...live, ...recent];
+  } catch (e) { console.error('Live fetch error:', e.message); }
 
   // 3. Upcoming from free schedule API
   let upcoming = [];
