@@ -2,7 +2,7 @@
 const path = require('path');
 const fs = require('fs');
 
-const DB_PATH = path.join(__dirname, 'ipl2026.json');
+const DB_PATH = path.join(__dirname, 'reddy.json');
 
 function load() {
   if (!fs.existsSync(DB_PATH)) {

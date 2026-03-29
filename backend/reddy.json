@@ -1,0 +1,98 @@
+{
+  "team_ratios": {
+    "Sunrisers Hyderabad": "2",
+    "Royal Challengers Bengaluru": "1"
+  },
+  "cached_matches": [
+    {
+      "id": "149618",
+      "seriesId": 9241,
+      "seriesName": "Indian Premier League 2026",
+      "matchDesc": "1st Match",
+      "matchFormat": "T20",
+      "dateTimeGMT": "2026-03-28T14:00:00.000Z",
+      "date": "2026-03-28",
+      "teams": [
+        "Royal Challengers Bengaluru",
+        "Sunrisers Hyderabad"
+      ],
+      "team1": {
+        "teamId": 59,
+        "teamName": "Royal Challengers Bengaluru",
+        "teamSName": "RCB",
+        "imageId": 860056
+      },
+      "team2": {
+        "teamId": 255,
+        "teamName": "Sunrisers Hyderabad",
+        "teamSName": "SRH",
+        "imageId": 860066
+      },
+      "venue": "M.Chinnaswamy Stadium, Bengaluru",
+      "timezone": "+05:30",
+      "status": "Match not started",
+      "matchStarted": false,
+      "matchEnded": false
+    },
+    {
+      "id": "149629",
+      "seriesId": 9241,
+      "seriesName": "Indian Premier League 2026",
+      "matchDesc": "2nd Match",
+      "matchFormat": "T20",
+      "dateTimeGMT": "2026-03-29T14:00:00.000Z",
+      "date": "2026-03-29",
+      "teams": [
+        "Mumbai Indians",
+        "Kolkata Knight Riders"
+      ],
+      "team1": {
+        "teamId": 62,
+        "teamName": "Mumbai Indians",
+        "teamSName": "MI",
+        "imageId": 860053
+      },
+      "team2": {
+        "teamId": 63,
+        "teamName": "Kolkata Knight Riders",
+        "teamSName": "KKR",
+        "imageId": 860046
+      },
+      "venue": "Wankhede Stadium, Mumbai",
+      "timezone": "+05:30",
+      "status": "Match not started",
+      "matchStarted": false,
+      "matchEnded": false
+    },
+    {
+      "id": "149640",
+      "seriesId": 9241,
+      "seriesName": "Indian Premier League 2026",
+      "matchDesc": "3rd Match",
+      "matchFormat": "T20",
+      "dateTimeGMT": "2026-03-30T14:00:00.000Z",
+      "date": "2026-03-30",
+      "teams": [
+        "Rajasthan Royals",
+        "Chennai Super Kings"
+      ],
+      "team1": {
+        "teamId": 64,
+        "teamName": "Rajasthan Royals",
+        "teamSName": "RR",
+        "imageId": 860055
+      },
+      "team2": {
+        "teamId": 58,
+        "teamName": "Chennai Super Kings",
+        "teamSName": "CSK",
+        "imageId": 860038
+      },
+      "venue": "Barsapara Cricket Stadium, Guwahati",
+      "timezone": "+05:30",
+      "status": "Match not started",
+      "matchStarted": false,
+      "matchEnded": false
+    }
+  ]
+}

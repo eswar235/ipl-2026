@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
 const db = require('./db');
-const STATIC_SCHEDULE = require('./ipl2026-schedule');
+const STATIC_SCHEDULE = require('./reddy-schedule');
 
 const app = express();
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'DELETE'] }));
@@ -203,7 +203,7 @@ app.get('/api/admin/verify', requireAdmin, (req, res) => res.json({ authenticate
 app.get('/ping', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
 app.listen(PORT, () => {
-  console.log(`IPL 2026 backend running on http://localhost:${PORT}`);
+  console.log(`Reddy backend running on http://localhost:${PORT}`);
   console.log(`RapidAPI key: ${RAPID_KEY ? 'loaded ✓' : 'MISSING'}`);
 
   const SELF_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
