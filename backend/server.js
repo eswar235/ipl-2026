@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
 const db = require('./db');
-const STATIC_SCHEDULE = require('./ipl2026-schedule');
+const STATIC_SCHEDULE = require('./reddy-schedule');
 
 const app = express();
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'DELETE'] }));
