@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
 const db = require('./db');
-const STATIC_SCHEDULE = require('./reddy-schedule');
+const STATIC_SCHEDULE = require('./ipl2026-schedule');
 
 const app = express();
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'DELETE'] }));
@@ -12,27 +12,21 @@ app.use(express.json());
 const RAPID_KEY = process.env.RAPID_API_KEY;
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'admin123';
 const PORT = process.env.PORT || 3001;
-
-// Free Cricbuzz API (schedule)
 const HOST_FREE = 'free-cricbuzz-cricket-api.p.rapidapi.com';
-// Full Cricbuzz API (live scores)
 const HOST_LIVE = 'cricbuzz-cricket.p.rapidapi.com';
 const IPL_SERIES_ID = 9241;
 
-const hFree = () => ({ 'x-rapidapi-key': RAPID_KEY, 'x-rapidapi-host': HOST_FREE, 'Content-Type': 'application/json' });
-const hLive = () => ({ 'x-rapidapi-key': RAPID_KEY, 'x-rapidapi-host': HOST_LIVE, 'Content-Type': 'application/json' });
+const hFree = () => ({ 'x-rapidapi-key': RAPID_KEY, 'x-rapidapi-host': HOST_FREE });
+const hLive = () => ({ 'x-rapidapi-key': RAPID_KEY, 'x-rapidapi-host': HOST_LIVE });
 
-// ─── Cache ───────────────────────────────────────────────────────────────────
 const cache = { matches: null, ts: 0 };
-const CACHE_TTL = 15 * 1000; // 15 seconds — fast updates during live matches
+const CACHE_TTL = 15 * 1000;
 
-// ─── Admin auth ───────────────────────────────────────────────────────────────
 function requireAdmin(req, res, next) {
   if (req.headers['x-admin-secret'] !== ADMIN_SECRET) return res.status(401).json({ error: 'Unauthorized' });
   next();
 }
 
-// ─── Fetch live IPL matches from Cricbuzz full API ───────────────────────────
 async function fetchFromCricbuzz(type) {
   const res = await fetch(`https://${HOST_LIVE}/matches/v1/${type}`, { headers: hLive() });
   const data = await res.json();
@@ -78,7 +72,6 @@ function formatScore(score, info) {
   };
 }
 
-// ─── Fetch upcoming from free schedule API ───────────────────────────────────
 async function fetchUpcomingIPL() {
   const res = await fetch(`https://${HOST_FREE}/cricket-schedule`, { headers: hFree() });
   const data = await res.json();
@@ -100,6 +93,7 @@ async function fetchUpcomingIPL() {
           team2: m.team2,
           venue: m.venueInfo ? `${m.venueInfo.ground}, ${m.venueInfo.city}` : '',
           status: 'Match not started',
+          state: 'Preview',
           matchStarted: false,
           matchEnded: false,
         });
@@ -109,76 +103,52 @@ async function fetchUpcomingIPL() {
   return matches;
 }
 
-function mergeMatches(base, override) {
-  const map = {};
-  for (const m of base) map[m.id] = m;
-  for (const m of override) {
-    // Live/Complete state always wins over static/cached
-    if (m.state === 'Complete' || m.state === 'In Progress' || m.matchStarted || m.matchEnded) {
-      map[m.id] = { ...map[m.id], ...m };
-    } else {
-      // Only override if no live data exists yet
-      map[m.id] = { ...m, ...(map[m.id]?.state ? map[m.id] : {}) };
-    }
-  }
-  return Object.values(map).sort((a, b) => new Date(a.dateTimeGMT || a.date) - new Date(b.dateTimeGMT || b.date));
-}
-
-// ─── Main match fetcher ───────────────────────────────────────────────────────
 async function fetchIPLMatches() {
   if (cache.matches && Date.now() - cache.ts < CACHE_TTL) return cache.matches;
 
-  // 1. Static schedule as base
   const staticMatches = STATIC_SCHEDULE.map(m => ({
     ...m, seriesName: 'Indian Premier League 2026', matchFormat: 'T20',
     team1: { teamName: m.teams[0] }, team2: { teamName: m.teams[1] },
-    status: 'Match not started', matchStarted: false, matchEnded: false,
+    status: 'Match not started', state: 'Preview', matchStarted: false, matchEnded: false,
   }));
 
-  // 2. Live + Recent matches from full Cricbuzz API
   let liveMatches = [];
   try {
-    const [live, recent] = await Promise.all([
-      fetchFromCricbuzz('live'),
-      fetchFromCricbuzz('recent')
-    ]);
+    const [live, recent] = await Promise.all([fetchFromCricbuzz('live'), fetchFromCricbuzz('recent')]);
     liveMatches = [...live, ...recent];
   } catch (e) { console.error('Live fetch error:', e.message); }
 
-  // 3. Upcoming from free schedule API
   let upcoming = [];
   try { upcoming = await fetchUpcomingIPL(); } catch (e) { console.error('Schedule fetch error:', e.message); }
 
-  // Merge: live/recent data wins over everything, static is just fallback
+  // Build live map — these always win
   const liveMap = {};
   for (const m of liveMatches) liveMap[m.id] = m;
 
+  // Start from static, override with live/upcoming
   const merged = staticMatches.map(s => {
-    // If we have live/recent data for this match, use it
     if (liveMap[s.id]) return { ...s, ...liveMap[s.id] };
-    // Otherwise use upcoming schedule data if available
     const up = upcoming.find(u => u.id === s.id);
     if (up) return { ...s, ...up };
     return s;
   });
 
-  // Add any live matches not in static schedule
+  // Add live matches not in static
   for (const m of liveMatches) {
     if (!merged.find(s => s.id === m.id)) merged.push(m);
   }
 
   merged.sort((a, b) => new Date(a.dateTimeGMT || a.date) - new Date(b.dateTimeGMT || b.date));
-
   if (liveMatches.length > 0) db.cacheMatches(liveMatches);
 
   cache.matches = merged;
   cache.ts = Date.now();
   return merged;
+}
 
-// ─── GET /api/matches ─────────────────────────────────────────────────────────
 app.get('/api/matches', async (req, res) => {
   try {
-    if (!RAPID_KEY) return res.status(500).json({ error: 'RAPID_API_KEY not set in backend/.env' });
+    if (!RAPID_KEY) return res.status(500).json({ error: 'RAPID_API_KEY not set' });
     const matches = await fetchIPLMatches();
     const ratios = db.getRatios();
     const enriched = matches.map(m => ({
@@ -192,15 +162,13 @@ app.get('/api/matches', async (req, res) => {
   }
 });
 
-// ─── GET /api/live ────────────────────────────────────────────────────────────
 app.get('/api/live', async (req, res) => {
   try {
     const matches = await fetchIPLMatches();
-    res.json({ matches: matches.filter(m => m.matchStarted && !m.matchEnded) });
+    res.json({ matches: matches.filter(m => m.state === 'In Progress') });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ─── GET /api/match/:id/score ─────────────────────────────────────────────────
 app.get('/api/match/:id/score', async (req, res) => {
   try {
     const r = await fetch(`https://${HOST_LIVE}/mcenter/v1/${req.params.id}/hscard`, { headers: hLive() });
@@ -209,10 +177,8 @@ app.get('/api/match/:id/score', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ─── GET /api/ratios ──────────────────────────────────────────────────────────
 app.get('/api/ratios', (req, res) => res.json(db.getAllRatios()));
 
-// ─── POST /api/admin/ratio ────────────────────────────────────────────────────
 app.post('/api/admin/ratio', requireAdmin, (req, res) => {
   const { teamName, ratio } = req.body;
   if (!teamName || ratio === undefined) return res.status(400).json({ error: 'teamName and ratio required' });
@@ -220,20 +186,16 @@ app.post('/api/admin/ratio', requireAdmin, (req, res) => {
   res.json({ success: true, teamName, ratio });
 });
 
-// ─── GET /api/admin/verify ────────────────────────────────────────────────────
 app.get('/api/admin/verify', requireAdmin, (req, res) => res.json({ authenticated: true }));
 
-// ─── Ping ─────────────────────────────────────────────────────────────────────
 app.get('/ping', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
 app.listen(PORT, () => {
-  console.log(`Reddy backend running on http://localhost:${PORT}`);
+  console.log(`Reddy IPL backend running on http://localhost:${PORT}`);
   console.log(`RapidAPI key: ${RAPID_KEY ? 'loaded ✓' : 'MISSING'}`);
-
   const SELF_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
   setInterval(async () => {
-    try { await fetch(`${SELF_URL}/ping`); console.log(`[keep-alive] ${new Date().toISOString()}`); }
+    try { await fetch(`${SELF_URL}/ping`); }
     catch (e) { console.log('[keep-alive] failed:', e.message); }
-  }, 4 * 60 * 1000); // every 4 minutes to prevent Render sleep
+  }, 4 * 60 * 1000);
 });
-}
