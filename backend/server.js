@@ -112,7 +112,15 @@ async function fetchUpcomingIPL() {
 function mergeMatches(base, override) {
   const map = {};
   for (const m of base) map[m.id] = m;
-  for (const m of override) map[m.id] = { ...map[m.id], ...m };
+  for (const m of override) {
+    // Live/Complete state always wins over static/cached
+    if (m.state === 'Complete' || m.state === 'In Progress' || m.matchStarted || m.matchEnded) {
+      map[m.id] = { ...map[m.id], ...m };
+    } else {
+      // Only override if no live data exists yet
+      map[m.id] = { ...m, ...(map[m.id]?.state ? map[m.id] : {}) };
+    }
+  }
   return Object.values(map).sort((a, b) => new Date(a.dateTimeGMT || a.date) - new Date(b.dateTimeGMT || b.date));
 }
 

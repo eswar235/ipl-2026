@@ -25,11 +25,11 @@ function getTeamMeta(name) {
   return key ? TEAM_META[key] : { abbr: name.slice(0, 3).toUpperCase(), color: '#334155' };
 }
 
-function StatusBadge({ status }) {
+function StatusBadge({ status, state }) {
   const s = (status || '').toLowerCase();
-  const isLive = s.includes('live') || s.includes('progress') || s.includes('innings');
-  const isCompleted = s.includes('won') || s.includes('result') || s.includes('tied') || s.includes('no result');
-  const isUpcoming = s.includes('not started') || s.includes('upcoming');
+  const isLive = state === 'In Progress';
+  const isCompleted = state === 'Complete' || s.includes('won') || s.includes('tied') || s.includes('no result');
+  const isUpcoming = !isLive && !isCompleted;
 
   const style = {
     padding: '3px 10px',
@@ -88,9 +88,10 @@ export default function MatchCard({ match }) {
   const teams = match.teams || [];
   const team1 = teams[0] || 'TBD';
   const team2 = teams[1] || 'TBD';
-  const isLive = (match.status || '').toLowerCase().includes('live') ||
-    (match.status || '').toLowerCase().includes('progress') ||
-    (match.status || '').toLowerCase().includes('innings');
+  const isLive = match.state === 'In Progress' ||
+    ((match.status || '').toLowerCase().includes('live') ||
+    (match.status || '').toLowerCase().includes('innings') ||
+    (match.matchStarted && !match.matchEnded));
 
   useEffect(() => {
     if (!match.id) return;
@@ -146,7 +147,7 @@ export default function MatchCard({ match }) {
           <span>{dateStr}</span>
           {timeStr && <span style={{ marginLeft: 8, color: '#475569' }}>{timeStr}</span>}
         </div>
-        <StatusBadge status={match.status} />
+        <StatusBadge status={match.status} state={match.state} />
       </div>
 
       {/* Teams */}

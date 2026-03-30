@@ -36,16 +36,13 @@ export default function App() {
   const filtered = matches.filter(m => {
     if (filter === 'All') return true;
     const s = (m.status || '').toLowerCase();
-    if (filter === 'Live') return s.includes('live') || s.includes('progress') || s.includes('innings');
-    if (filter === 'Upcoming') return s.includes('not started') || s.includes('upcoming');
-    if (filter === 'Completed') return s.includes('won') || s.includes('result') || s.includes('tied') || s.includes('no result');
+    if (filter === 'Live') return m.state === 'In Progress';
+    if (filter === 'Upcoming') return !m.state || m.state === 'Preview' || m.status === 'Match not started';
+    if (filter === 'Completed') return m.state === 'Complete';
     return true;
   });
 
-  const liveCount = matches.filter(m => {
-    const s = (m.status || '').toLowerCase();
-    return s.includes('live') || s.includes('progress') || s.includes('innings');
-  }).length;
+  const liveCount = matches.filter(m => m.state === 'In Progress').length;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
