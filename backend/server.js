@@ -149,20 +149,31 @@ async function fetchIPLMatches() {
   let upcoming = [];
   try { upcoming = await fetchUpcomingIPL(); } catch (e) { console.error('Schedule fetch error:', e.message); }
 
-  // Merge: static → upcoming → live (live has highest priority)
-  let merged = mergeMatches(staticMatches, upcoming);
-  merged = mergeMatches(merged, liveMatches);
+  // Merge: live/recent data wins over everything, static is just fallback
+  const liveMap = {};
+  for (const m of liveMatches) liveMap[m.id] = m;
 
-  // Persist live matches to survive restarts
+  const merged = staticMatches.map(s => {
+    // If we have live/recent data for this match, use it
+    if (liveMap[s.id]) return { ...s, ...liveMap[s.id] };
+    // Otherwise use upcoming schedule data if available
+    const up = upcoming.find(u => u.id === s.id);
+    if (up) return { ...s, ...up };
+    return s;
+  });
+
+  // Add any live matches not in static schedule
+  for (const m of liveMatches) {
+    if (!merged.find(s => s.id === m.id)) merged.push(m);
+  }
+
+  merged.sort((a, b) => new Date(a.dateTimeGMT || a.date) - new Date(b.dateTimeGMT || b.date));
+
   if (liveMatches.length > 0) db.cacheMatches(liveMatches);
-  const stored = db.getCachedMatches();
-  merged = mergeMatches(merged, stored);
-  merged = mergeMatches(merged, liveMatches); // live always wins
 
   cache.matches = merged;
   cache.ts = Date.now();
   return merged;
-}
 
 // ─── GET /api/matches ─────────────────────────────────────────────────────────
 app.get('/api/matches', async (req, res) => {
@@ -225,3 +236,4 @@ app.listen(PORT, () => {
     catch (e) { console.log('[keep-alive] failed:', e.message); }
   }, 4 * 60 * 1000); // every 4 minutes to prevent Render sleep
 });
+}
