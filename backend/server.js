@@ -13,7 +13,7 @@ const RAPID_KEY = process.env.RAPID_API_KEY;
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'admin123';
 const PORT = process.env.PORT || 3001;
 const HOST_FREE = 'free-cricbuzz-cricket-api.p.rapidapi.com';
-const HOST_LIVE = 'cricbuzz-cricket.p.rapidapi.com';
+const HOST_LIVE = 'cricbuzz-cricket2.p.rapidapi.com';
 const IPL_SERIES_ID = 9241;
 
 const hFree = () => ({ 'x-rapidapi-key': RAPID_KEY, 'x-rapidapi-host': HOST_FREE });
